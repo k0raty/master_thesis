@@ -1,0 +1,115 @@
+Vagrant.configure(2) do |config|
+
+  # Before you must install these plugins to speed up Vagrant provisioning
+  # vagrant plugin install vagrant-faster
+  # vagrant plugin install vagrant-cachier
+  
+  # Configuration variables
+	#  Wazuh Agent IPs
+	 AGENT_IP1="192.168.56.1"
+	 AGENT_IP2="192.168.56.2"
+	#  Wazuh Server IP
+	 WAZUH_SERVER_IP="192.168.56.0"
+
+	# HARDWARE #
+	#  CPU and Memory configurations
+	 MANAGER_CPUS=4
+	 MANAGER_MEM=6000
+	 AGENT_CPUS=2
+	 AGENT_MEM=2048
+
+  
+  config.cache.auto_detect = true
+  
+  # Set some variables
+  etcHosts = ""
+  clickhouse = ""
+  monitoring = ""
+  superset = ""
+  logs = ""
+
+  case ARGV[0]
+  when "provision", "up"
+    # Handle the provision and up commands if needed
+  end
+
+  # Some settings for common server (not for haproxy)
+  common = <<-SHELL
+    sudo apt update -qq 2>&1 >/dev/null
+    sudo apt install -y -qq iftop curl software-properties-common git vim tree net-tools telnet git 2>&1 >/dev/null
+    #sudo apt install -y -qq iftop curl openjdk-11-jre-headless software-properties-common git vim tree net-tools telnet git 2>&1 >/dev/null
+    sed -i 's/ChallengeResponseAuthentication no/ChallengeResponseAuthentication yes/g' /etc/ssh/sshd_config
+    sudo systemctl restart sshd
+  SHELL
+
+  docker = <<-SHELL
+    curl -fsSL https://get.docker.com -o get-docker.sh 2>&1 >/dev/null
+    sudo sh get-docker.sh 2>&1 >/dev/null
+    sudo usermod -aG docker vagrant
+    sudo service docker start
+    sudo curl -L "https://github.com/docker/compose/releases/download/1.25.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+    sudo chmod 755 /usr/local/bin/docker-compose
+  SHELL
+
+  config.vm.box = "ubuntu/jammy64"
+  config.vm.box_url = "ubuntu/jammy64"
+
+  # Set servers list and their parameters
+  NODES = [
+    { :hostname => "wazidx1", :ip => WAZUH_SERVER_IP, :cpus => MANAGER_CPUS, :mem => MANAGER_MEM, :type => "server" },
+    { :hostname => "wazagent1", :ip => AGENT_IP1, :cpus => AGENT_CPUS, :mem => AGENT_MEM, :type => "agent" },
+    { :hostname => "wazagent2", :ip => AGENT_IP2, :cpus => AGENT_CPUS, :mem => AGENT_MEM, :type => "agent" }
+  ]
+
+  # Define /etc/hosts for all servers
+  NODES.each do |node|
+    etcHosts += "echo '#{node[:ip]}   #{node[:hostname]}' >> /etc/hosts\n"
+  end # End NODES
+
+  # Run installation
+  NODES.each do |node|
+    config.vm.define node[:hostname] do |cfg|
+      cfg.vm.hostname = node[:hostname]
+      cfg.vm.network "private_network", ip: node[:ip]
+      
+      cfg.vm.provider "virtualbox" do |v|
+        v.customize ["modifyvm", :id, "--cpus", node[:cpus]]
+        v.customize ["modifyvm", :id, "--memory", node[:mem]]
+        v.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
+        v.customize ["modifyvm", :id, "--name", node[:hostname]]
+        v.customize ["modifyvm", :id, "--ioapic", "on"]
+        v.customize ["modifyvm", :id, "--nictype1", "virtio"]
+      end # End provider
+
+      # For all
+      cfg.vm.provision :shell, :path => "install_xavki.sh"
+      cfg.vm.provision :shell, :inline => etcHosts
+      cfg.vm.provision :shell, :inline => common
+      cfg.vm.provision :shell, :path => "install_node_exporter.sh"
+      
+      # Copy the configuration script to the VM
+      cfg.vm.provision "file", source: "wazuh_config.sh", destination: "/home/vagrant/wazuh_config.sh"
+
+      # Make the script executable
+      cfg.vm.provision "shell", inline: <<-SHELL
+        chmod +x /home/vagrant/wazuh_config.sh
+      SHELL
+
+      # Execute the configuration script
+      cfg.vm.provision "shell", inline: <<-SHELL
+        /home/vagrant/wazuh_config.sh
+      SHELL
+
+      if node[:type] == "server"
+        cfg.vm.provision :shell, :path => "install_wazuh_server.sh"
+      end
+
+      if node[:type] == "agent"
+        cfg.vm.provision :shell, :path => "install_wazuh_agent.sh"
+      end
+
+    end # End config
+  end # End nodes
+
+end 
+
