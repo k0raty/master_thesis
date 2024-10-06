@@ -4,8 +4,6 @@ Software system monitoring network based on advanced methods
 
 # Wazuh Environment Setup with Vagrant, Docker, and VirtualBox
 The setup is based on a VAGRANT env (https://gitlab.com/xavki/vagrant-files/-/tree/master/wazuh?ref_type=heads )
- 
- Here's a full `README.md` for setting up the Wazuh environment using Vagrant, Docker, and VirtualBox. It includes instructions on modifying the `ossec.conf` files and managing VMs with Vagrant.
 
 ```markdown
 ## Prerequisites
@@ -135,8 +133,12 @@ sudo systemctl stop wazuh-agent
 
 - Make sure your IP addresses are consistent across all configuration files (`ossec.conf`).
 - Vagrant provisions the environment using scripts, which automate the installation and setup process.
+- To get credentials for login :  
+```bash
+tar -axf wazuh-install-files.tar wazuh-install-files/wazuh-passwords.txt -O | grep -P "\'admin\'" -A 1
+```bash
 
 ## Contact
 
-For any issues or further assistance, please contact [support@example.com](mailto:antony.davi@centrale.centralelille.fr).
+For any issues or further assistance, please contact [antony.davi@centrale.centralelille.fr](mailto:antony.davi@centrale.centralelille.fr).
 ```
