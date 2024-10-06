@@ -11,7 +11,7 @@ echo "deb [signed-by=/usr/share/keyrings/wazuh.gpg] $WAZUH_AGENT_REPO_URL stable
 apt-get update
 
 # Install the Wazuh agent version that matches the manager
-WAZUH_MANAGER="$WAZUH_SERVER_IP" apt-get install wazuh-agent=WAZUH_VERSION
+WAZUH_MANAGER="$WAZUH_SERVER_IP" apt-get install wazuh-agent
 
 # Enable and start the Wazuh agent service
 systemctl daemon-reload
