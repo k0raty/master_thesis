@@ -1,0 +1,54 @@
+### Server
+
+
+#!/usr/bin/bash
+
+
+curl -sO https://packages.wazuh.com/4.7/wazuh-install.sh
+curl -sO https://packages.wazuh.com/4.7/config.yml
+
+echo '
+nodes:
+  # Wazuh indexer nodes
+  indexer:
+    - name: wazidx1
+      ip: "192.168.12.181"
+
+  server:
+    - name: wazidx1
+      ip: "192.168.12.181"
+
+  # Wazuh dashboard nodes
+  dashboard:
+    - name: wazidx1
+      ip: "192.168.12.181"
+'> config.yml 
+
+bash wazuh-install.sh --generate-config-files
+
+curl -sO https://packages.wazuh.com/4.7/wazuh-install.sh
+
+bash wazuh-install.sh --wazuh-indexer wazidx1
+
+bash wazuh-install.sh --start-cluster
+
+tar -axf wazuh-install-files.tar wazuh-install-files/wazuh-passwords.txt -O | grep -P "\'admin\'" -A 1
+
+bash wazuh-install.sh --wazuh-server wazidx1
+
+bash wazuh-install.sh --wazuh-dashboard wazidx1
+
+
+### Agent
+
+curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH | gpg --no-default-keyring --keyring gnupg-ring:/usr/share/keyrings/wazuh.gpg --import && chmod 644 /usr/share/keyrings/wazuh.gpg
+
+echo "deb [signed-by=/usr/share/keyrings/wazuh.gpg] https://packages.wazuh.com/4.x/apt/ stable main" | tee -a /etc/apt/sources.list.d/wazuh.list
+
+apt-get update
+
+WAZUH_MANAGER="192.168.12.181" apt-get install wazuh-agent
+
+systemctl daemon-reload
+systemctl enable wazuh-agent
+systemctl start wazuh-agent
