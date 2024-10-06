@@ -135,7 +135,7 @@ sudo systemctl stop wazuh-agent
 - Vagrant provisions the environment using scripts, which automate the installation and setup process.
 - To get credentials for login :  
 ```bash
-tar -axf wazuh-install-files.tar wazuh-install-files/wazuh-passwords.txt -O | grep -P "\'admin\'" -A 1
+sudo tar -axf wazuh-install-files.tar wazuh-install-files/wazuh-passwords.txt -O | grep -P "\'admin\'" -A 1
 ```bash
 
 ## Contact
