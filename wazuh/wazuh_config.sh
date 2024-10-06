@@ -6,7 +6,8 @@
 #VERSION BTW MANAGER AND AGENT HAVE TO MATCH#
 
 # Define the Wazuh version
-export WAZUH_VERSION="4.9.0-1"
+#export WAZUH_AGENT_VERSION="4.9.0-1"
+export WAZUH_VERSION="4.9"
 
 # Repository URL for the Wazuh agent
 export WAZUH_GPG_KEY="https://packages.wazuh.com/$WAZUH_VERSION/apt/doc/wazuh-key.gpg"
