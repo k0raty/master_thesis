@@ -8,10 +8,16 @@ source wazuh_config.sh  # Update this path to the actual location of your config
 # WAZUH_SERVER_IP="192.168.56.0"
 # WAZUH_DASHBOARD_IP="192.168.56.0"
 
-
 # Download the installation script and config file
 curl -sO $WAZUH_MANAGER_INSTALL_SCRIPT_URL
 curl -sO $WAZUH_MANAGER_CONFIG_SCRIPT_URL
+
+# Ensure that SSH server is configured to accept public key authentication
+sudo sed -i '/^#\?PubkeyAuthentication /c\PubkeyAuthentication yes' /etc/ssh/sshd_config
+sudo sed -i '/^#\?AuthorizedKeysFile /c\AuthorizedKeysFile .ssh/authorized_keys' /etc/ssh/sshd_config
+
+# Restart the SSH service to apply changes
+sudo systemctl restart sshd
 
 # Create a new config.yml file with dynamic IP addresses using echo
 echo 'nodes:
@@ -29,7 +35,9 @@ echo 'nodes:
     - name: wazidx1
       ip: "'"$WAZUH_DASHBOARD_IP"'"
 ' > config.yml
+
 echo $WAZUH_INDEXER_IP
+
 # Run the Wazuh installation script to generate config files
 bash wazuh-install.sh --generate-config-files
 
@@ -50,5 +58,4 @@ bash wazuh-install.sh --wazuh-server wazidx1
 bash wazuh-install.sh --wazuh-dashboard wazidx1
 
 # Restart the Wazuh dashboard service
-systemctl restart wazuh-dashboard
-
+sudo systemctl restart wazuh-dashboard

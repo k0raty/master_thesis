@@ -136,8 +136,66 @@ sudo systemctl stop wazuh-agent
 - To get credentials for login :  
 ```bash
 sudo tar -axf wazuh-install-files.tar wazuh-install-files/wazuh-passwords.txt -O | grep -P "\'admin\'" -A 1
-```bash
+```
 
+### Access VM on VScode
+
+## Prerequisites
+
+    Public/Private SSH Key Pair:
+        Before proceeding, ensure that you have an SSH key pair (id_ed25519 or id_rsa) generated on your local machine. You can generate one using the command below if you don't already have it:
+
+        bash
+
+    ssh-keygen -t ed25519 -C "your_email@example.com"
+
+    The private key will be stored in ~/.ssh/id_ed25519 (or id_rsa), and the public key will be in ~/.ssh/id_ed25519.pub.
+
+## Public Key on VM:
+
+    To access your VMs via SSH, your public key must be added to the VM. This is typically done by placing the public key (~/.ssh/id_ed25519.pub) in the ~/.ssh/authorized_keys file of the root user on the VM.
+    Ensure that password authentication is disabled, and only key-based access is used for added security.
+
+The `generate_ssh_config.sh` script is designed to **automate the process** of modifying the `~/.ssh/config` file on your local machine, simplifying SSH access to your VMs. Instead of manually entering configuration details for each machine, the script automatically generates the necessary SSH configurations for specific VMs and updates the `~/.ssh/config` file accordingly.
+
+This means that after running the script, you'll have predefined shortcuts in your SSH configuration file for each of your VMs. These shortcuts make it easy to connect to each VM using a simple alias, without having to specify details like hostname, port, user, or SSH key manually.
+
+Here's how the automation works:
+
+- The script creates SSH entries for each VM (e.g., `wazidx1`, `wazagent1`, and `wazagent2`), defining essential parameters such as:
+  - **Host**: The alias for the VM (e.g., `wazidx1`).
+  - **HostName**: The VM's IP address (e.g., `127.0.0.1`).
+  - **Port**: The port to connect via SSH (e.g., `2222`).
+  - **User**: The user account for SSH access (e.g., `root`).
+  - **IdentityFile**: The path to your private SSH key (e.g., `~/.ssh/id_ed25519`).
+  
+- The script automatically modifies the `~/.ssh/config` file to include these details, replacing existing configurations for these hosts if necessary.
+
+This process saves time and reduces the chances of error when setting up SSH access to multiple VMs. After running the script, you can connect to any configured VM using a simple command like:
+```bash
+ssh wazidx1
+```
+
+Additionally, the script ensures that SSH access is set up securely by enforcing key-based authentication, disabling password authentication, and configuring SSH settings for automation.
+
+By using this script, you can streamline the configuration process, making it easy to manage multiple VMs without manually editing the SSH config file.
+
+## Using SSH in VSCode
+
+You can also access these VMs via Visual Studio Code using the Remote - SSH extension, which allows you to open a remote machine or VM in VSCode over SSH.
+
+    Install the Remote - SSH extension:
+        Go to the Extensions view in VSCode (Ctrl+Shift+X) and search for "Remote - SSH." Install it.
+
+    Connect to a VM:
+        Open the Command Palette (Ctrl+Shift+P), type "Remote-SSH: Connect to Host...", and select it.
+        Type the alias of your VM (e.g., wazidx1) from the SSH config file, and you'll be connected to the VM.
+        Once connected, you'll be able to use VSCode just as you would on your local machine, with access to the filesystem, terminal, and more.
+
+    Root Access:
+        Since the User in your ~/.ssh/config is set to root, you'll be connected as the root user, giving you full administrative access to the VM.
+
+This setup allows you to use VSCode for development directly on your remote VMs without needing to open separate terminal windows, making it convenient to manage multiple machines.
 ## Contact
 
 For any issues or further assistance, please contact [antony.davi@centrale.centralelille.fr](mailto:antony.davi@centrale.centralelille.fr).
