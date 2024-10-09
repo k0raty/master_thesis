@@ -21,9 +21,9 @@ export WAZUH_MANAGER_CONFIG_SCRIPT_URL="https://packages.wazuh.com/$WAZUH_VERSIO
 # IP Addresses #
 
 # Export Manager IPss
-export WAZUH_SERVER_IP="192.168.56.0"
-export WAZUH_INDEXER_IP="192.168.56.0"  # Removed space around the '='
-export WAZUH_DASHBOARD_IP="192.168.56.0"  # Removed space around the '='
+export WAZUH_SERVER_IP="192.168.56.12"
+export WAZUH_INDEXER_IP="192.168.56.12"  # Removed space around the '='
+export WAZUH_DASHBOARD_IP="192.168.56.12"  # Removed space around the '='
 
 # PORTS #
 #export AGENT_PORT="1514"

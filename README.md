@@ -55,13 +55,23 @@ Modify the `<server>` tags in `ossec.conf`:
 
 The `Vagrantfile` defines the network and system resources for each virtual machine. It will configure the Wazuh manager and two agents.
 
-Modify the `Vagrantfile` if needed, or proceed with the default settings. The default nodes are:
-
-- **Wazuh Manager**: IP `192.168.56.0`, 4 CPUs, 6000MB RAM
-- **Agent 1**: IP `192.168.56.1`, 2 CPUs, 2048MB RAM
-- **Agent 2**: IP `192.168.56.2`, 2 CPUs, 2048MB RAM
+Modify the `Vagrantfile` if needed, or proceed with the default settings. 
 
 If using the plugin vagrant-faster , CPUs and memory would be allocated accordingly to the machine specification : may be unappropriate while running vm on vscode
+In our Vagrantfile, we use the following IP addresses:
+
+    wazagent1: 192.168.56.10
+    wazagent2: 192.168.56.11
+    wazidx1 (Wazuh Server): 192.168.56.12
+
+Before running vagrant up, make sure to check these IP addresses for conflicts:
+
+ping 192.168.56.10
+ping 192.168.56.11
+ping 192.168.56.12
+
+If any of these IP addresses respond, they are already in use, and you should choose different IP addresses.
+
 ### 4. Launch the Environment
 
 To create and launch the environment, run the following:

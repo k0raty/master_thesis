@@ -1,12 +1,16 @@
 #!/usr/bin/bash
+source wazuh_config.sh
 
-# Source the Wazuh configuration file to get the IP addresses
-source wazuh_config.sh  # Update this path to the actual location of your config file
+# Capture the Wazuh server's IP address
+WAZUH_SERVER_IP=$(hostname -I | awk '{print $1}')
+echo "Node: $(hostname) - IP: $WAZUH_SERVER_IP" >> /vagrant/credentials.txt
 
-# Assuming your wazuh_config.sh file has the following variables defined:
-# WAZUH_INDEXER_IP="192.168.56.0"
-# WAZUH_SERVER_IP="192.168.56.0"
-# WAZUH_DASHBOARD_IP="192.168.56.0"
+# WAZUH_INDEXER_IP, WAZUH_DASHBOARD_IP, and any other IPs can similarly be extracted from credentials.txt if needed.
+WAZUH_INDEXER_IP=$WAZUH_SERVER_IP
+WAZUH_DASHBOARD_IP=$WAZUH_SERVER_IP
+
+# Save the IP address to credentials.txt
+echo "Node: wazidx1 - IP: $WAZUH_SERVER_IP" >> /vagrant/credentials.txt
 
 # Download the installation script and config file
 curl -sO $WAZUH_MANAGER_INSTALL_SCRIPT_URL
@@ -36,20 +40,17 @@ echo 'nodes:
       ip: "'"$WAZUH_DASHBOARD_IP"'"
 ' > config.yml
 
-echo $WAZUH_INDEXER_IP
-
 # Run the Wazuh installation script to generate config files
 bash wazuh-install.sh --generate-config-files
 
 # Install the specified version of Wazuh
-curl -sO $WAZUH_MANAGER_INSTALL_SCRIPT_URL
 bash wazuh-install.sh --wazuh-indexer wazidx1
 
 # Start the Wazuh cluster
 bash wazuh-install.sh --start-cluster
 
-# Extract the Wazuh admin passwords
-tar -axf wazuh-install-files.tar wazuh-install-files/wazuh-passwords.txt -O | grep -P "\'admin\'" -A 1
+# Extract the Wazuh admin passwords and save them
+tar -axf wazuh-install-files.tar wazuh-install-files/wazuh-passwords.txt -O | grep -P "\'admin\'" -A 1 >> /vagrant/credentials.txt
 
 # Set the Wazuh server
 bash wazuh-install.sh --wazuh-server wazidx1

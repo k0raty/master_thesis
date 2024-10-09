@@ -1,33 +1,27 @@
 Vagrant.configure(2) do |config|
-  # TODO If no local key avaiable , basic process withou Vscode configuration
+  # TODO If no local key available, basic process without VScode configuration
   # TODO Ensuring it is installing Docker and centralizing the process
+  # TODO removing the credential.txt file while running a vagrant up
   # Before you must install these plugins to speed up Vagrant provisioning
   # vagrant plugin install vagrant-faster | WITHOUT VSCODE
   # vagrant plugin install vagrant-cachier
-  
+
   # Configuration variables
-	#  Wazuh Agent IPs
-	 AGENT_IP1="192.168.56.1"
-	 AGENT_IP2="192.168.56.2"
-	#  Wazuh Server IP
-	 WAZUH_SERVER_IP="192.168.56.0"
+  # Remove specific IP addresses for DHCP
+  # Wazuh Server IP (commented out for DHCP)
+  # WAZUH_SERVER_IP = "192.168.56.12"  
 
-	# HARDWARE #
-	#  CPU and Memory configurations
-	 MANAGER_CPUS=8
-	 MANAGER_MEM=6000
-	 AGENT_CPUS=2
-	 AGENT_MEM=2048
+  # HARDWARE #
+  # CPU and Memory configurations
+  MANAGER_CPUS = 8
+  MANAGER_MEM = 6000
+  AGENT_CPUS = 2
+  AGENT_MEM = 2048
 
-  
   config.cache.auto_detect = true
-  
+
   # Set some variables
   etcHosts = ""
-  clickhouse = ""
-  monitoring = ""
-  superset = ""
-  logs = ""
 
   case ARGV[0]
   when "provision", "up"
@@ -38,10 +32,12 @@ Vagrant.configure(2) do |config|
   common = <<-SHELL
     sudo apt update -qq 2>&1 >/dev/null
     sudo apt install -y -qq iftop curl software-properties-common git vim tree net-tools telnet git 2>&1 >/dev/null
-    #sudo apt install -y -qq iftop curl openjdk-11-jre-headless software-properties-common git vim tree net-tools telnet git 2>&1 >/dev/null
     sed -i 's/ChallengeResponseAuthentication no/ChallengeResponseAuthentication yes/g' /etc/ssh/sshd_config
     sudo systemctl restart sshd
   SHELL
+
+  # Removing conflicting files before each set up
+
 
   docker = <<-SHELL
     curl -fsSL https://get.docker.com -o get-docker.sh 2>&1 >/dev/null
@@ -57,22 +53,48 @@ Vagrant.configure(2) do |config|
 
   # Set servers list and their parameters
   NODES = [
-    { :hostname => "wazidx1", :ip => WAZUH_SERVER_IP, :cpus => MANAGER_CPUS, :mem => MANAGER_MEM, :type => "server" },
-    { :hostname => "wazagent1", :ip => AGENT_IP1, :cpus => AGENT_CPUS, :mem => AGENT_MEM, :type => "agent" },
-    { :hostname => "wazagent2", :ip => AGENT_IP2, :cpus => AGENT_CPUS, :mem => AGENT_MEM, :type => "agent" }
+    { hostname: "wazidx1", ip: nil, cpus: MANAGER_CPUS, mem: MANAGER_MEM, type: "server" },  # DHCP for server
+    { hostname: "wazagent1", ip: nil, cpus: AGENT_CPUS, mem: AGENT_MEM, type: "agent" },  # DHCP for agent
+    { hostname: "wazagent2", ip: nil, cpus: AGENT_CPUS, mem: AGENT_MEM, type: "agent" }   # DHCP for agent
   ]
-
-  # Define /etc/hosts for all servers
-  NODES.each do |node|
-    etcHosts += "echo '#{node[:ip]}   #{node[:hostname]}' >> /etc/hosts\n"
-  end # End NODES
 
   # Run installation
   NODES.each do |node|
     config.vm.define node[:hostname] do |cfg|
       cfg.vm.hostname = node[:hostname]
-      cfg.vm.network "private_network", ip: node[:ip]
       
+      # Set the network configuration
+      cfg.vm.network "private_network", type: "dhcp"
+      # Provisioning logic
+      cfg.vm.provision "shell", inline: <<-SHELL
+        #!/usr/bin/env bash
+        # Wait for a moment to ensure the network is up
+        sleep 10
+
+        # Get the assigned IP address
+        ASSIGNED_IP=\$(hostname -I | awk '{print \$1}')
+
+        # Define the path to the credentials file
+        CREDENTIALS_FILE=/vagrant/credentials.txt
+
+        # Check if the credentials file exists
+        if [[ -f "\$CREDENTIALS_FILE" ]]; then
+          # Read existing IPs from the credentials file
+          EXISTING_IPS=\$(cat \$CREDENTIALS_FILE | awk '{print \$4}')
+
+          # Loop to check for duplicate IPs
+          while echo "\$EXISTING_IPS" | grep -q "\$ASSIGNED_IP"; do
+            # If a duplicate IP is found, increment the last octet
+            IFS='.' read -r i1 i2 i3 i4 <<< "\$ASSIGNED_IP"
+            i4=\$((i4 + 1))
+            ASSIGNED_IP="\$i1.\$i2.\$i3.\$i4"
+          done
+        fi
+
+        # Log the assigned IP to the credentials file
+        echo "Node: #{node[:hostname]} - IP: \$ASSIGNED_IP" >> \$CREDENTIALS_FILE
+      SHELL
+
       cfg.vm.provider "virtualbox" do |v|
         v.customize ["modifyvm", :id, "--cpus", node[:cpus]]
         v.customize ["modifyvm", :id, "--memory", node[:mem]]
@@ -82,12 +104,11 @@ Vagrant.configure(2) do |config|
         v.customize ["modifyvm", :id, "--nictype1", "virtio"]
       end # End provider
 
-      # For all
+      # Provisioning
       cfg.vm.provision :shell, :path => "install_xavki.sh"
-      cfg.vm.provision :shell, :inline => etcHosts
       cfg.vm.provision :shell, :inline => common
       cfg.vm.provision :shell, :path => "install_node_exporter.sh"
-      
+
       # Copy the configuration script to the VM
       cfg.vm.provision "file", source: "wazuh_config.sh", destination: "/home/vagrant/wazuh_config.sh"
 
@@ -101,7 +122,7 @@ Vagrant.configure(2) do |config|
         /home/vagrant/wazuh_config.sh
       SHELL
 
-      # Add the SSH key to the root user's authorized_keys file | Being able to connect to ssh machines as a root on VScode #TODO Dynamic approach to access a particular key on the computer
+      # Add the SSH key to the root user's authorized_keys file
       cfg.vm.provision "shell", inline: <<-SHELL
         sudo mkdir -p /root/.ssh
         sudo chmod 700 /root/.ssh
@@ -110,7 +131,13 @@ Vagrant.configure(2) do |config|
       SHELL
 
       if node[:type] == "server"
+        # Install Wazuh server
         cfg.vm.provision :shell, :path => "install_wazuh_server.sh"
+
+      #   # Extract and save credentials to a file on the host machine
+      #   cfg.vm.provision "shell", inline: <<-SHELL
+      #     sudo tar -axf wazuh-install-files.tar wazuh-install-files/wazuh-passwords.txt -O | grep -P "'admin'" -A 1 > /vagrant/credentials.txt
+      #   SHELL
       end
 
       if node[:type] == "agent"
@@ -120,10 +147,13 @@ Vagrant.configure(2) do |config|
     end # End config
   end # End nodes
 
-  # # Run the script to generate the SSH configuration file
+  # # Capture the assigned IP addresses for all nodes
   # config.vm.provision "shell", inline: <<-SHELL
-  #  bash generate_ssh_config.sh
+  #   sleep 10  # Ensure network is up
+  #   for node in #{NODES.map { |node| node[:hostname] }.join(' ')}; do
+  #     IP=\$(vagrant ssh -o StrictHostKeyChecking=no vagrant@\$node 'hostname -I | awk '\''{print \$1}'\'') || true
+  #     echo "Node: \$node - IP: \$IP" >> /vagrant/credentials.txt
+  #   done
   # SHELL
 
-end 
-
+end
