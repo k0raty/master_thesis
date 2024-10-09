@@ -61,6 +61,7 @@ Modify the `Vagrantfile` if needed, or proceed with the default settings. The de
 - **Agent 1**: IP `192.168.56.1`, 2 CPUs, 2048MB RAM
 - **Agent 2**: IP `192.168.56.2`, 2 CPUs, 2048MB RAM
 
+If using the plugin vagrant-faster , CPUs and memory would be allocated accordingly to the machine specification : may be unappropriate while running vm on vscode
 ### 4. Launch the Environment
 
 To create and launch the environment, run the following:
@@ -128,7 +129,7 @@ sudo systemctl stop wazuh-manager
 sudo systemctl start wazuh-agent
 sudo systemctl stop wazuh-agent
 ```
-
+#### 
 ### Notes
 
 - Make sure your IP addresses are consistent across all configuration files (`ossec.conf`).
