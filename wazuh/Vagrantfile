@@ -19,11 +19,11 @@ Vagrant.configure(2) do |config|
   AGENT_MEM = 2048
 
   # Define the Wazuh server IP address (can be nil)
-  WAZUH_SERVER_IP = "192.168.56.0" # Change this to a specific IP if needed (Ranges: 192.168.56.0/21)
+  WAZUH_SERVER_IP = "192.168.56.10" # Change this to a specific IP if needed (Ranges: 192.168.56.0/21)
 
-  #  Wazuh Agent IPs
-  AGENT_IP1="192.168.56.1"
-  AGENT_IP2="192.168.56.2"
+  # #  Wazuh Agent IPs
+  # AGENT_IP1="192.168.56.11"
+  # AGENT_IP2="192.168.56.12"
 
   config.cache.auto_detect = true
 
@@ -40,14 +40,16 @@ Vagrant.configure(2) do |config|
   end
 
   # Common provisioning script
+  
+  # Some settings for common server (not for haproxy)
   common = <<-SHELL
     sudo apt update -qq 2>&1 >/dev/null
     sudo apt install -y -qq iftop curl software-properties-common git vim tree net-tools telnet git 2>&1 >/dev/null
+    #sudo apt install -y -qq iftop curl openjdk-11-jre-headless software-properties-common git vim tree net-tools telnet git 2>&1 >/dev/null
     sed -i 's/ChallengeResponseAuthentication no/ChallengeResponseAuthentication yes/g' /etc/ssh/sshd_config
     sudo systemctl restart sshd
   SHELL
 
-  # Docker installation script
   docker = <<-SHELL
     curl -fsSL https://get.docker.com -o get-docker.sh 2>&1 >/dev/null
     sudo sh get-docker.sh 2>&1 >/dev/null
@@ -71,39 +73,32 @@ Vagrant.configure(2) do |config|
 
   ## NODES definition ##
   
-  # # Set servers list and their parameters
-  # NODES = [
-  #   { :hostname => "wazidx1", :ip => WAZUH_SERVER_IP, :cpus => MANAGER_CPUS, :mem => MANAGER_MEM, :type => "server" },
-  #   { :hostname => "wazagent1", :ip => nil, :cpus => AGENT_CPUS, :mem => AGENT_MEM, :type => "agent" },
-  #   { :hostname => "wazagent2", :ip => nil, :cpus => AGENT_CPUS, :mem => AGENT_MEM, :type => "agent" }
-  # ]
   # Set servers list and their parameters
   NODES = [
     { :hostname => "wazidx1", :ip => WAZUH_SERVER_IP, :cpus => MANAGER_CPUS, :mem => MANAGER_MEM, :type => "server" },
-    { :hostname => "wazagent1", :ip => AGENT_IP1, :cpus => AGENT_CPUS, :mem => AGENT_MEM, :type => "agent" },
-    { :hostname => "wazagent2", :ip => AGENT_IP2, :cpus => AGENT_CPUS, :mem => AGENT_MEM, :type => "agent" }
+    { :hostname => "wazagent1", :ip => nil, :cpus => AGENT_CPUS, :mem => AGENT_MEM, :type => "agent" },
+    { :hostname => "wazagent2", :ip => nil, :cpus => AGENT_CPUS, :mem => AGENT_MEM, :type => "agent" }
   ]
 
-   
-  # Define /etc/hosts for all servers
-  NODES.each_with_index do |node, index|
-    # if node[:type] == "server"   # Correct comparison operator
-    #   # Check if node[:ip] exists (not nil)
-    #   if node[:ip].nil?
-    #     raise "Error: IP address not found for server node '#{node[:hostname]}'"
-    #   end
-  
-    # # Assigning IP's for other machines
-    # else
-    #   highest_ip = NODES[index - 1][:ip]
-    #   node[:ip] = increment_ip(highest_ip)
-    # end
-  
-    # Add the IP and hostname to /etc/hosts
-    etcHosts += "echo '#{node[:ip]}   #{node[:hostname]}' >> /etc/hosts\n"
-  end  # End NODES loop
-  
+# Define /etc/hosts for all servers
+previous_ip = nil
 
+NODES.each do |node|
+  if node[:type] == "server"
+    # Server node: use the predefined server IP
+    node[:ip] = WAZUH_SERVER_IP
+    previous_ip = node[:ip]
+    puts "Assigned server IP: #{node[:ip]} to #{node[:hostname]}"
+  else
+    # Agent node: assign IP dynamically by incrementing the previous IP
+    node[:ip] = increment_ip(previous_ip)
+    previous_ip = node[:ip]
+    puts "Assigned agent IP: #{node[:ip]} to #{node[:hostname]}"
+  end
+
+  # Add the IP and hostname to /etc/hosts
+  etcHosts += "echo '#{node[:ip]}   #{node[:hostname]}' >> /etc/hosts\n"
+end
 
   ## Dynamic Cleaning before any other actions ##
 
@@ -118,26 +113,19 @@ Vagrant.configure(2) do |config|
   #   puts "First building of the server, cleaning ..."
   # end
 
-  
   # Run installation
-  NODES.each_with_index do |node,index|
-    
-
-    
+  index = 0
+  NODES.each do |node|
     config.vm.define node[:hostname] do |cfg|
 
-      # Cleaning #
-      if index == 0
-        cfg.vm.provision "shell", path: "cleaner.sh"
-      end
-
+      # if index == 0
+      #   cfg.vm.provision "shell", path: "cleaner.sh"
+      # end
+      index = index +1
       cfg.vm.hostname = node[:hostname]
-      
-      # Set the network configuration
-        
       cfg.vm.network "private_network", ip: node[:ip]
       puts "Set #{node[:hostname]} IP to #{node[:ip]}"
-      
+
       cfg.vm.provider "virtualbox" do |v|
         v.customize ["modifyvm", :id, "--cpus", node[:cpus]]
         v.customize ["modifyvm", :id, "--memory", node[:mem]]
@@ -145,15 +133,14 @@ Vagrant.configure(2) do |config|
         v.customize ["modifyvm", :id, "--name", node[:hostname]]
         v.customize ["modifyvm", :id, "--ioapic", "on"]
         v.customize ["modifyvm", :id, "--nictype1", "virtio"]
-      end
+      end # End provider
 
-      # Provisioning
       # For all
       cfg.vm.provision :shell, :path => "install_xavki.sh"
       cfg.vm.provision :shell, :inline => etcHosts
       cfg.vm.provision :shell, :inline => common
       cfg.vm.provision :shell, :path => "install_node_exporter.sh"
-
+      
       # Copy the configuration script to the VM
       cfg.vm.provision "file", source: "wazuh_config.sh", destination: "/home/vagrant/wazuh_config.sh"
 
@@ -167,33 +154,24 @@ Vagrant.configure(2) do |config|
         /home/vagrant/wazuh_config.sh
       SHELL
 
-      # Add the SSH key to the root user's authorized_keys file
-      cfg.vm.provision "shell", inline: <<-SHELL
-        sudo mkdir -p /root/.ssh
-        sudo chmod 700 /root/.ssh
-        echo "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOKaytswjNm0jowz8c8Ss8QC5D6UwN+tVmfBYXx1pr7L antony.davi@centrale.centralelille.fr" >> /root/.ssh/authorized_keys
-        sudo chmod 600 /root/.ssh/authorized_keys
-      SHELL
-
       if node[:type] == "server"
-        # Install Wazuh server
-        cfg.vm.provision "shell", path: "install_wazuh_server.sh"
+        cfg.vm.provision :shell, :path => "install_wazuh_server.sh"
       end
 
       if node[:type] == "agent"
-        cfg.vm.provision "shell", path: "install_wazuh_agent.sh"
+        cfg.vm.provision :shell, :path => "install_wazuh_agent.sh"
       end
+
     end # End config
   end # End nodes
   
 end
-
-
 ## Final logs ##
 
 # Append the message to the end of credentials.txt
 File.open("credentials.txt", "a") do |file|
   file.puts "\nPlease, check the IP's to ensure there isn't any conflict"
+  puts "Added IP conflict warning to credentials.txt."
 end
 
-puts "Added IP conflict warning to credentials.txt."
+
