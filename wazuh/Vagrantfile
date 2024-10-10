@@ -1,34 +1,45 @@
 Vagrant.configure(2) do |config|
+
   # TODO If no local key available, basic process without VScode configuration
   # TODO Ensuring it is installing Docker and centralizing the process
-  # TODO removing the credential.txt file while running a vagrant up
+  # TODO Dynamic generation of servers and agents
+  # TODO DHCP assignations of IP adresses for all servers in the correct range
+  # TODO Verification of possible IP conflict
+  # TODO Dynamic machine dir 
+  
+
   # Before you must install these plugins to speed up Vagrant provisioning
   # vagrant plugin install vagrant-faster | WITHOUT VSCODE
   # vagrant plugin install vagrant-cachier
 
   # Configuration variables
-  # Remove specific IP addresses for DHCP
-  # Wazuh Server IP (commented out for DHCP)
-  # WAZUH_SERVER_IP = "192.168.56.12"  
-
-  # HARDWARE #
-  # CPU and Memory configurations
   MANAGER_CPUS = 8
   MANAGER_MEM = 6000
   AGENT_CPUS = 2
   AGENT_MEM = 2048
 
+  # Define the Wazuh server IP address (can be nil)
+  WAZUH_SERVER_IP = "192.168.56.0" # Change this to a specific IP if needed (Ranges: 192.168.56.0/21)
+
+  #  Wazuh Agent IPs
+  AGENT_IP1="192.168.56.1"
+  AGENT_IP2="192.168.56.2"
+
   config.cache.auto_detect = true
 
   # Set some variables
   etcHosts = ""
+  clickhouse = ""
+  monitoring = ""
+  superset = ""
+  logs = ""
 
   case ARGV[0]
   when "provision", "up"
     # Handle the provision and up commands if needed
   end
 
-  # Some settings for common server (not for haproxy)
+  # Common provisioning script
   common = <<-SHELL
     sudo apt update -qq 2>&1 >/dev/null
     sudo apt install -y -qq iftop curl software-properties-common git vim tree net-tools telnet git 2>&1 >/dev/null
@@ -36,9 +47,7 @@ Vagrant.configure(2) do |config|
     sudo systemctl restart sshd
   SHELL
 
-  # Removing conflicting files before each set up
-
-
+  # Docker installation script
   docker = <<-SHELL
     curl -fsSL https://get.docker.com -o get-docker.sh 2>&1 >/dev/null
     sudo sh get-docker.sh 2>&1 >/dev/null
@@ -51,50 +60,84 @@ Vagrant.configure(2) do |config|
   config.vm.box = "ubuntu/jammy64"
   config.vm.box_url = "ubuntu/jammy64"
 
+  # Required functions #
+
+  # Function to increment the IP address
+  def increment_ip(ip)
+    parts = ip.split('.')
+    parts[3] = (parts[3].to_i + 1).to_s
+    parts.join('.')
+  end
+
+  ## NODES definition ##
+  
+  # # Set servers list and their parameters
+  # NODES = [
+  #   { :hostname => "wazidx1", :ip => WAZUH_SERVER_IP, :cpus => MANAGER_CPUS, :mem => MANAGER_MEM, :type => "server" },
+  #   { :hostname => "wazagent1", :ip => nil, :cpus => AGENT_CPUS, :mem => AGENT_MEM, :type => "agent" },
+  #   { :hostname => "wazagent2", :ip => nil, :cpus => AGENT_CPUS, :mem => AGENT_MEM, :type => "agent" }
+  # ]
   # Set servers list and their parameters
   NODES = [
-    { hostname: "wazidx1", ip: nil, cpus: MANAGER_CPUS, mem: MANAGER_MEM, type: "server" },  # DHCP for server
-    { hostname: "wazagent1", ip: nil, cpus: AGENT_CPUS, mem: AGENT_MEM, type: "agent" },  # DHCP for agent
-    { hostname: "wazagent2", ip: nil, cpus: AGENT_CPUS, mem: AGENT_MEM, type: "agent" }   # DHCP for agent
+    { :hostname => "wazidx1", :ip => WAZUH_SERVER_IP, :cpus => MANAGER_CPUS, :mem => MANAGER_MEM, :type => "server" },
+    { :hostname => "wazagent1", :ip => AGENT_IP1, :cpus => AGENT_CPUS, :mem => AGENT_MEM, :type => "agent" },
+    { :hostname => "wazagent2", :ip => AGENT_IP2, :cpus => AGENT_CPUS, :mem => AGENT_MEM, :type => "agent" }
   ]
 
+   
+  # Define /etc/hosts for all servers
+  NODES.each_with_index do |node, index|
+    # if node[:type] == "server"   # Correct comparison operator
+    #   # Check if node[:ip] exists (not nil)
+    #   if node[:ip].nil?
+    #     raise "Error: IP address not found for server node '#{node[:hostname]}'"
+    #   end
+  
+    # # Assigning IP's for other machines
+    # else
+    #   highest_ip = NODES[index - 1][:ip]
+    #   node[:ip] = increment_ip(highest_ip)
+    # end
+  
+    # Add the IP and hostname to /etc/hosts
+    etcHosts += "echo '#{node[:ip]}   #{node[:hostname]}' >> /etc/hosts\n"
+  end  # End NODES loop
+  
+
+
+  ## Dynamic Cleaning before any other actions ##
+
+  # Check if the .vagrant/machines directory for the server node exists
+  # machine_dir = "/home/koraty/VirtualBox VMs/wazidx1"
+        
+  # if Dir.exist?(machine_dir)
+  #   puts "The server node 'wazidx1' already exists. We keep previous IPs."
+  # else
+  #   # Remove the credentials.txt file before building the machines
+  #   File.delete("credentials.txt") if File.exist?("credentials.txt")
+  #   puts "First building of the server, cleaning ..."
+  # end
+
+  
   # Run installation
-  NODES.each do |node|
+  NODES.each_with_index do |node,index|
+    
+
+    
     config.vm.define node[:hostname] do |cfg|
+
+      # Cleaning #
+      if index == 0
+        cfg.vm.provision "shell", path: "cleaner.sh"
+      end
+
       cfg.vm.hostname = node[:hostname]
       
       # Set the network configuration
-      cfg.vm.network "private_network", type: "dhcp"
-      # Provisioning logic
-      cfg.vm.provision "shell", inline: <<-SHELL
-        #!/usr/bin/env bash
-        # Wait for a moment to ensure the network is up
-        sleep 10
-
-        # Get the assigned IP address
-        ASSIGNED_IP=\$(hostname -I | awk '{print \$1}')
-
-        # Define the path to the credentials file
-        CREDENTIALS_FILE=/vagrant/credentials.txt
-
-        # Check if the credentials file exists
-        if [[ -f "\$CREDENTIALS_FILE" ]]; then
-          # Read existing IPs from the credentials file
-          EXISTING_IPS=\$(cat \$CREDENTIALS_FILE | awk '{print \$4}')
-
-          # Loop to check for duplicate IPs
-          while echo "\$EXISTING_IPS" | grep -q "\$ASSIGNED_IP"; do
-            # If a duplicate IP is found, increment the last octet
-            IFS='.' read -r i1 i2 i3 i4 <<< "\$ASSIGNED_IP"
-            i4=\$((i4 + 1))
-            ASSIGNED_IP="\$i1.\$i2.\$i3.\$i4"
-          done
-        fi
-
-        # Log the assigned IP to the credentials file
-        echo "Node: #{node[:hostname]} - IP: \$ASSIGNED_IP" >> \$CREDENTIALS_FILE
-      SHELL
-
+        
+      cfg.vm.network "private_network", ip: node[:ip]
+      puts "Set #{node[:hostname]} IP to #{node[:ip]}"
+      
       cfg.vm.provider "virtualbox" do |v|
         v.customize ["modifyvm", :id, "--cpus", node[:cpus]]
         v.customize ["modifyvm", :id, "--memory", node[:mem]]
@@ -102,10 +145,12 @@ Vagrant.configure(2) do |config|
         v.customize ["modifyvm", :id, "--name", node[:hostname]]
         v.customize ["modifyvm", :id, "--ioapic", "on"]
         v.customize ["modifyvm", :id, "--nictype1", "virtio"]
-      end # End provider
+      end
 
       # Provisioning
+      # For all
       cfg.vm.provision :shell, :path => "install_xavki.sh"
+      cfg.vm.provision :shell, :inline => etcHosts
       cfg.vm.provision :shell, :inline => common
       cfg.vm.provision :shell, :path => "install_node_exporter.sh"
 
@@ -132,28 +177,23 @@ Vagrant.configure(2) do |config|
 
       if node[:type] == "server"
         # Install Wazuh server
-        cfg.vm.provision :shell, :path => "install_wazuh_server.sh"
-
-      #   # Extract and save credentials to a file on the host machine
-      #   cfg.vm.provision "shell", inline: <<-SHELL
-      #     sudo tar -axf wazuh-install-files.tar wazuh-install-files/wazuh-passwords.txt -O | grep -P "'admin'" -A 1 > /vagrant/credentials.txt
-      #   SHELL
+        cfg.vm.provision "shell", path: "install_wazuh_server.sh"
       end
 
       if node[:type] == "agent"
-        cfg.vm.provision :shell, :path => "install_wazuh_agent.sh"
+        cfg.vm.provision "shell", path: "install_wazuh_agent.sh"
       end
-
     end # End config
   end # End nodes
-
-  # # Capture the assigned IP addresses for all nodes
-  # config.vm.provision "shell", inline: <<-SHELL
-  #   sleep 10  # Ensure network is up
-  #   for node in #{NODES.map { |node| node[:hostname] }.join(' ')}; do
-  #     IP=\$(vagrant ssh -o StrictHostKeyChecking=no vagrant@\$node 'hostname -I | awk '\''{print \$1}'\'') || true
-  #     echo "Node: \$node - IP: \$IP" >> /vagrant/credentials.txt
-  #   done
-  # SHELL
-
+  
 end
+
+
+## Final logs ##
+
+# Append the message to the end of credentials.txt
+File.open("credentials.txt", "a") do |file|
+  file.puts "\nPlease, check the IP's to ensure there isn't any conflict"
+end
+
+puts "Added IP conflict warning to credentials.txt."

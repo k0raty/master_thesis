@@ -5,7 +5,7 @@ source wazuh_config.sh  # Update this path to the actual location of your config
 
 # Capture the Wazuh agent's IP address
 WAZUH_AGENT_IP=$(hostname -I | awk '{print $1}')
-echo "Node: $(hostname) - IP: $WAZUH_AGENT_IP" >> /vagrant/credentials.txt
+echo "Node: $(hostname) - IP: $WAZUH_AGENT_IP" >> $CREDENTIALS_FILE
 
 # Add GPG key and repository using the repository URL from the config
 curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH | gpg --no-default-keyring --keyring gnupg-ring:/usr/share/keyrings/wazuh.gpg --import && chmod 644 /usr/share/keyrings/wazuh.gpg

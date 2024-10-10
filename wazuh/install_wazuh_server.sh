@@ -3,14 +3,11 @@ source wazuh_config.sh
 
 # Capture the Wazuh server's IP address
 WAZUH_SERVER_IP=$(hostname -I | awk '{print $1}')
-echo "Node: $(hostname) - IP: $WAZUH_SERVER_IP" >> /vagrant/credentials.txt
+echo "Node: $(hostname) - IP: $WAZUH_SERVER_IP" >> $CREDENTIALS_FILE
 
 # WAZUH_INDEXER_IP, WAZUH_DASHBOARD_IP, and any other IPs can similarly be extracted from credentials.txt if needed.
 WAZUH_INDEXER_IP=$WAZUH_SERVER_IP
 WAZUH_DASHBOARD_IP=$WAZUH_SERVER_IP
-
-# Save the IP address to credentials.txt
-echo "Node: wazidx1 - IP: $WAZUH_SERVER_IP" >> /vagrant/credentials.txt
 
 # Download the installation script and config file
 curl -sO $WAZUH_MANAGER_INSTALL_SCRIPT_URL
