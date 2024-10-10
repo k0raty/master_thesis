@@ -2,18 +2,17 @@ Vagrant.configure(2) do |config|
 
   # TODO If no local key available, basic process without VScode configuration
   # TODO Ensuring it is installing Docker and centralizing the process
-  # TODO Dynamic generation of servers and agents
-  # TODO DHCP assignations of IP adresses for all servers in the correct range
-  # TODO Verification of possible IP conflict
-  # TODO Dynamic machine dir 
-  
+  # TOHAVE Dynamic generation of servers and agents
+  # TOHAVE DHCP assignations of IP adresses for all servers in the correct range
+  # TOHAVE Verification of possible IP conflict
+  # TOHAVE Dynamic machine dir 
 
   # Before you must install these plugins to speed up Vagrant provisioning
   # vagrant plugin install vagrant-faster | WITHOUT VSCODE
   # vagrant plugin install vagrant-cachier
 
   # Configuration variables
-  MANAGER_CPUS = 8
+  MANAGER_CPUS = 4
   MANAGER_MEM = 6000
   AGENT_CPUS = 2
   AGENT_MEM = 2048
@@ -100,8 +99,9 @@ NODES.each do |node|
   etcHosts += "echo '#{node[:ip]}   #{node[:hostname]}' >> /etc/hosts\n"
 end
 
+  
+  #DRAFT  
   ## Dynamic Cleaning before any other actions ##
-
   # Check if the .vagrant/machines directory for the server node exists
   # machine_dir = "/home/koraty/VirtualBox VMs/wazidx1"
         
@@ -114,14 +114,12 @@ end
   # end
 
   # Run installation
-  index = 0
-  NODES.each do |node|
+  NODES.each_with_index do |node, index|
     config.vm.define node[:hostname] do |cfg|
 
-      # if index == 0
-      #   cfg.vm.provision "shell", path: "cleaner.sh"
-      # end
-      index = index +1
+      if index == 0
+        cfg.vm.provision "shell", path: "cleaner.sh"
+      end
       cfg.vm.hostname = node[:hostname]
       cfg.vm.network "private_network", ip: node[:ip]
       puts "Set #{node[:hostname]} IP to #{node[:ip]}"
@@ -154,6 +152,14 @@ end
         /home/vagrant/wazuh_config.sh
       SHELL
 
+      # Add the SSH key to the root user's authorized_keys file
+      cfg.vm.provision "shell", inline: <<-SHELL
+        sudo mkdir -p /root/.ssh
+        sudo chmod 700 /root/.ssh
+        echo "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOKaytswjNm0jowz8c8Ss8QC5D6UwN+tVmfBYXx1pr7L antony.davi@centrale.centralelille.fr" >> /root/.ssh/authorized_keys
+        sudo chmod 600 /root/.ssh/authorized_keys
+      SHELL
+
       if node[:type] == "server"
         cfg.vm.provision :shell, :path => "install_wazuh_server.sh"
       end
@@ -166,12 +172,7 @@ end
   end # End nodes
   
 end
-## Final logs ##
 
-# Append the message to the end of credentials.txt
-File.open("credentials.txt", "a") do |file|
-  file.puts "\nPlease, check the IP's to ensure there isn't any conflict"
-  puts "Added IP conflict warning to credentials.txt."
-end
+## Final logs ##
 
 

@@ -72,6 +72,29 @@ ping 192.168.56.12
 
 If any of these IP addresses respond, they are already in use, and you should choose different IP addresses.
 
+Here's a simple README you can use to highlight the point about IP addresses in your Vagrant setup for Wazuh:
+
+## Network Configuration
+By default, Vagrant creates a **NAT (Network Address Translation)** interface for internet access. This means that each VM will have at least two IP addresses:
+
+1. **NAT IP Address**: This is typically in the `10.0.2.x` range and is used for outgoing connections to the internet. 
+2. **Private Network IP Address**: This is usually in the `192.168.56.x` range and is specifically assigned for communication between your VMs and the host machine.
+
+### Important Note
+For the Wazuh server and agent configurations, you should **use the private network IP address** (the second one, e.g., `192.168.56.11`) instead of the NAT IP address. The NAT IP is not intended for inter-VM communication and might cause connectivity issues between the Wazuh server and agents.
+
+## Example
+When you run the command:
+```bash
+hostname -I
+```
+You may receive output similar to:
+```
+10.0.2.15 192.168.56.11
+```
+- **10.0.2.15**: This is the NAT IP address (not for Wazuh use).
+- **192.168.56.11**: This is the private network IP address (use this for Wazuh configuration).
+
 ### 4. Launch the Environment
 
 To create and launch the environment, run the following:

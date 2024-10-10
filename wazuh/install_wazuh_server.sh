@@ -1,8 +1,8 @@
 #!/usr/bin/bash
 source wazuh_config.sh
 
-# Capture the Wazuh server's IP address
-WAZUH_SERVER_IP=$(hostname -I | awk '{print $1}')
+# Capture the Wazuh server's IP address | use the private network IP address (the second one)
+WAZUH_SERVER_IP=$(hostname -I | awk '{print $2}')
 echo "Node: $(hostname) - IP: $WAZUH_SERVER_IP" >> $CREDENTIALS_FILE
 
 # WAZUH_INDEXER_IP, WAZUH_DASHBOARD_IP, and any other IPs can similarly be extracted from credentials.txt if needed.
