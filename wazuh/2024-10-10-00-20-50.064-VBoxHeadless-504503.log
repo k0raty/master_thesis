@@ -1,0 +1,12 @@
+Log created: 2024-10-10T00:20:50.640468000Z
+Process ID:  504503 (0x7b2b7)
+Parent PID:  6154 (0x180a)
+Executable:  /usr/lib/virtualbox/VBoxHeadless
+Arg[0]: /usr/lib/virtualbox/VBoxHeadless
+Arg[1]: --comment
+Arg[2]: wazidx1
+Arg[3]: --startvm
+Arg[4]: f01ba7e8-05e9-4840-b0ee-95be87bef59a
+Arg[5]: --vrde
+Arg[6]: config
+AddRef: illegal refcnt=3221225469 state=2

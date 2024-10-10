@@ -1,17 +1,24 @@
 #!/usr/bin/bash
+source wazuh_config.sh
 
-# Source the Wazuh configuration file to get the IP addresses
-source wazuh_config.sh  # Update this path to the actual location of your config file
+# Capture the Wazuh server's IP address | use the private network IP address (the second one)
+WAZUH_SERVER_IP=$(hostname -I | awk '{print $2}')
+echo "Node: $(hostname) - IP: $WAZUH_SERVER_IP" >> $CREDENTIALS_FILE
 
-# Assuming your wazuh_config.sh file has the following variables defined:
-# WAZUH_INDEXER_IP="192.168.56.0"
-# WAZUH_SERVER_IP="192.168.56.0"
-# WAZUH_DASHBOARD_IP="192.168.56.0"
-
+# WAZUH_INDEXER_IP, WAZUH_DASHBOARD_IP, and any other IPs can similarly be extracted from credentials.txt if needed.
+WAZUH_INDEXER_IP=$WAZUH_SERVER_IP
+WAZUH_DASHBOARD_IP=$WAZUH_SERVER_IP
 
 # Download the installation script and config file
 curl -sO $WAZUH_MANAGER_INSTALL_SCRIPT_URL
 curl -sO $WAZUH_MANAGER_CONFIG_SCRIPT_URL
+
+# Ensure that SSH server is configured to accept public key authentication
+sudo sed -i '/^#\?PubkeyAuthentication /c\PubkeyAuthentication yes' /etc/ssh/sshd_config
+sudo sed -i '/^#\?AuthorizedKeysFile /c\AuthorizedKeysFile .ssh/authorized_keys' /etc/ssh/sshd_config
+
+# Restart the SSH service to apply changes
+sudo systemctl restart sshd
 
 # Create a new config.yml file with dynamic IP addresses using echo
 echo 'nodes:
@@ -29,19 +36,18 @@ echo 'nodes:
     - name: wazidx1
       ip: "'"$WAZUH_DASHBOARD_IP"'"
 ' > config.yml
-echo $WAZUH_INDEXER_IP
+
 # Run the Wazuh installation script to generate config files
 bash wazuh-install.sh --generate-config-files
 
 # Install the specified version of Wazuh
-curl -sO $WAZUH_MANAGER_INSTALL_SCRIPT_URL
 bash wazuh-install.sh --wazuh-indexer wazidx1
 
 # Start the Wazuh cluster
 bash wazuh-install.sh --start-cluster
 
-# Extract the Wazuh admin passwords
-tar -axf wazuh-install-files.tar wazuh-install-files/wazuh-passwords.txt -O | grep -P "\'admin\'" -A 1
+# Extract the Wazuh admin passwords and save them
+tar -axf wazuh-install-files.tar wazuh-install-files/wazuh-passwords.txt -O | grep -P "\'admin\'" -A 1 >> /vagrant/credentials.txt
 
 # Set the Wazuh server
 bash wazuh-install.sh --wazuh-server wazidx1
@@ -50,5 +56,4 @@ bash wazuh-install.sh --wazuh-server wazidx1
 bash wazuh-install.sh --wazuh-dashboard wazidx1
 
 # Restart the Wazuh dashboard service
-systemctl restart wazuh-dashboard
-
+sudo systemctl restart wazuh-dashboard

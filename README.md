@@ -55,11 +55,45 @@ Modify the `<server>` tags in `ossec.conf`:
 
 The `Vagrantfile` defines the network and system resources for each virtual machine. It will configure the Wazuh manager and two agents.
 
-Modify the `Vagrantfile` if needed, or proceed with the default settings. The default nodes are:
+Modify the `Vagrantfile` if needed, or proceed with the default settings. 
 
-- **Wazuh Manager**: IP `192.168.56.0`, 4 CPUs, 6000MB RAM
-- **Agent 1**: IP `192.168.56.1`, 2 CPUs, 2048MB RAM
-- **Agent 2**: IP `192.168.56.2`, 2 CPUs, 2048MB RAM
+If using the plugin vagrant-faster , CPUs and memory would be allocated accordingly to the machine specification : may be unappropriate while running vm on vscode
+In our Vagrantfile, we use the following IP addresses:
+
+    wazagent1: 192.168.56.10
+    wazagent2: 192.168.56.11
+    wazidx1 (Wazuh Server): 192.168.56.12
+
+Before running vagrant up, make sure to check these IP addresses for conflicts:
+
+ping 192.168.56.10
+ping 192.168.56.11
+ping 192.168.56.12
+
+If any of these IP addresses respond, they are already in use, and you should choose different IP addresses.
+
+Here's a simple README you can use to highlight the point about IP addresses in your Vagrant setup for Wazuh:
+
+## Network Configuration
+By default, Vagrant creates a **NAT (Network Address Translation)** interface for internet access. This means that each VM will have at least two IP addresses:
+
+1. **NAT IP Address**: This is typically in the `10.0.2.x` range and is used for outgoing connections to the internet. 
+2. **Private Network IP Address**: This is usually in the `192.168.56.x` range and is specifically assigned for communication between your VMs and the host machine.
+
+### Important Note
+For the Wazuh server and agent configurations, you should **use the private network IP address** (the second one, e.g., `192.168.56.11`) instead of the NAT IP address. The NAT IP is not intended for inter-VM communication and might cause connectivity issues between the Wazuh server and agents.
+
+## Example
+When you run the command:
+```bash
+hostname -I
+```
+You may receive output similar to:
+```
+10.0.2.15 192.168.56.11
+```
+- **10.0.2.15**: This is the NAT IP address (not for Wazuh use).
+- **192.168.56.11**: This is the private network IP address (use this for Wazuh configuration).
 
 ### 4. Launch the Environment
 
@@ -128,7 +162,7 @@ sudo systemctl stop wazuh-manager
 sudo systemctl start wazuh-agent
 sudo systemctl stop wazuh-agent
 ```
-
+#### 
 ### Notes
 
 - Make sure your IP addresses are consistent across all configuration files (`ossec.conf`).
@@ -136,8 +170,66 @@ sudo systemctl stop wazuh-agent
 - To get credentials for login :  
 ```bash
 sudo tar -axf wazuh-install-files.tar wazuh-install-files/wazuh-passwords.txt -O | grep -P "\'admin\'" -A 1
-```bash
+```
 
+### Access VM on VScode
+
+## Prerequisites
+
+    Public/Private SSH Key Pair:
+        Before proceeding, ensure that you have an SSH key pair (id_ed25519 or id_rsa) generated on your local machine. You can generate one using the command below if you don't already have it:
+
+        bash
+
+    ssh-keygen -t ed25519 -C "your_email@example.com"
+
+    The private key will be stored in ~/.ssh/id_ed25519 (or id_rsa), and the public key will be in ~/.ssh/id_ed25519.pub.
+
+## Public Key on VM:
+
+    To access your VMs via SSH, your public key must be added to the VM. This is typically done by placing the public key (~/.ssh/id_ed25519.pub) in the ~/.ssh/authorized_keys file of the root user on the VM.
+    Ensure that password authentication is disabled, and only key-based access is used for added security.
+
+The `generate_ssh_config.sh` script is designed to **automate the process** of modifying the `~/.ssh/config` file on your local machine, simplifying SSH access to your VMs. Instead of manually entering configuration details for each machine, the script automatically generates the necessary SSH configurations for specific VMs and updates the `~/.ssh/config` file accordingly.
+
+This means that after running the script, you'll have predefined shortcuts in your SSH configuration file for each of your VMs. These shortcuts make it easy to connect to each VM using a simple alias, without having to specify details like hostname, port, user, or SSH key manually.
+
+Here's how the automation works:
+
+- The script creates SSH entries for each VM (e.g., `wazidx1`, `wazagent1`, and `wazagent2`), defining essential parameters such as:
+  - **Host**: The alias for the VM (e.g., `wazidx1`).
+  - **HostName**: The VM's IP address (e.g., `127.0.0.1`).
+  - **Port**: The port to connect via SSH (e.g., `2222`).
+  - **User**: The user account for SSH access (e.g., `root`).
+  - **IdentityFile**: The path to your private SSH key (e.g., `~/.ssh/id_ed25519`).
+  
+- The script automatically modifies the `~/.ssh/config` file to include these details, replacing existing configurations for these hosts if necessary.
+
+This process saves time and reduces the chances of error when setting up SSH access to multiple VMs. After running the script, you can connect to any configured VM using a simple command like:
+```bash
+ssh wazidx1
+```
+
+Additionally, the script ensures that SSH access is set up securely by enforcing key-based authentication, disabling password authentication, and configuring SSH settings for automation.
+
+By using this script, you can streamline the configuration process, making it easy to manage multiple VMs without manually editing the SSH config file.
+
+## Using SSH in VSCode
+
+You can also access these VMs via Visual Studio Code using the Remote - SSH extension, which allows you to open a remote machine or VM in VSCode over SSH.
+
+    Install the Remote - SSH extension:
+        Go to the Extensions view in VSCode (Ctrl+Shift+X) and search for "Remote - SSH." Install it.
+
+    Connect to a VM:
+        Open the Command Palette (Ctrl+Shift+P), type "Remote-SSH: Connect to Host...", and select it.
+        Type the alias of your VM (e.g., wazidx1) from the SSH config file, and you'll be connected to the VM.
+        Once connected, you'll be able to use VSCode just as you would on your local machine, with access to the filesystem, terminal, and more.
+
+    Root Access:
+        Since the User in your ~/.ssh/config is set to root, you'll be connected as the root user, giving you full administrative access to the VM.
+
+This setup allows you to use VSCode for development directly on your remote VMs without needing to open separate terminal windows, making it convenient to manage multiple machines.
 ## Contact
 
 For any issues or further assistance, please contact [antony.davi@centrale.centralelille.fr](mailto:antony.davi@centrale.centralelille.fr).

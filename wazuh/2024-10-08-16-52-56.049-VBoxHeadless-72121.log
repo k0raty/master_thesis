@@ -1,0 +1,12 @@
+Log created: 2024-10-08T16:52:56.495099000Z
+Process ID:  72121 (0x119b9)
+Parent PID:  3986 (0xf92)
+Executable:  /usr/lib/virtualbox/VBoxHeadless
+Arg[0]: /usr/lib/virtualbox/VBoxHeadless
+Arg[1]: --comment
+Arg[2]: wazagent2
+Arg[3]: --startvm
+Arg[4]: c794346a-9b45-496b-9de1-29b2fc6086bd
+Arg[5]: --vrde
+Arg[6]: config
+AddRef: illegal refcnt=3221225469 state=2
